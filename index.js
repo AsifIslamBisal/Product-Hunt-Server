@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.olaoh3z.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -25,6 +25,91 @@ async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
+
+    const userCollection = client.db("product-hunt").collection("users");
+    const productCollection = client.db("product-hunt").collection("products");
+    const reviewsCollection = client.db("product-hunt").collection("reviews");
+
+    // users
+
+    app.get('/users', async (req,res) =>{
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.get('/user/admin/:email', async(req,res) => {
+      const email = req. params.email;
+      if (email !== req.decoded.email) {
+        return req.statusCode(403).send ({message: 'forbidden access'})
+      }
+      const query = {email: email};
+      const user = await userCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user?.role ==='admin';
+      }
+      res.send({admin})
+    });
+
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+      const query = {email: user.email}
+      const existingUser = await userCollection.findOne(query);
+      if (existingUser) {
+        return res.send({message: 'user alredy exists', insertedId: null})
+      }
+      const result = await userCollection. insertOne(user);
+      res.send(result);
+    });
+
+    app.patch('/users/admin/:id', async(req,res) =>{
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: 'admin'
+        }
+      }
+      const result = await userCollection.updateOne(filter,updatedDoc);
+      res.send(result);
+    })
+
+    app.delete('users/:id' , async(req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id) }
+      const result = await userCollection.deleteOne(query);
+      res.send(result);
+    })
+
+    // all products
+    app.get('/products', async(req, res) =>{
+        const result = await productCollection.find().toArray();
+        res.send(result);
+    });
+
+    app.get('/products/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id) }
+      const result = await productCollection.findOne(query);
+      res.send(result);
+    });
+
+
+    // all reviews
+    app.post('/reviews/:id', async (req,res) => {
+      const reviewsDoc = req.body;
+      const result = await reviewsCollection.insertOne(reviewsDoc);
+      res.send(result);
+    });
+
+    app.get('/reviews/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { productId: id }; // যদি productId দিয়ে review খুঁজিস
+      const result = await reviewsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
