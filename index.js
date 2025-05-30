@@ -59,6 +59,7 @@ async function run() {
       const email = req.decoded.email;
       const query = {email: email};
       const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === 'admin';
       if (!isAdmin) {
         return res.status(403).send({message: 'forbidden access'});
       }
@@ -73,10 +74,21 @@ async function run() {
       res.send(result);
     });
 
-    app.get('/user/admin/:email',verifyToken, async(req,res) => {
+    app.get('/users/me', verifyToken, async (req, res) => {
+  const email = req.decoded.email;  // টোকেন থেকে email পাওয়া যাবে
+  const user = await userCollection.findOne({ email: email });
+  if (!user) {
+    return res.status(404).send({ message: 'User not found' });
+  }
+  res.send(user);
+});
+
+
+
+    app.get('/users/admin/:email',verifyToken, async(req,res) => {
       const email = req. params.email;
       if (email !== req.decoded.email) {
-        return req.statusCode(403).send ({message: 'forbidden access'})
+        return req.status(403).send ({message: 'forbidden access'})
       }
       const query = {email: email};
       const user = await userCollection.findOne(query);
@@ -84,7 +96,7 @@ async function run() {
       if (user) {
         admin = user?.role ==='admin';
       }
-      res.send({admin})
+      res.send({admin});
     });
 
     app.post('/users', async (req, res) => {
@@ -110,7 +122,7 @@ async function run() {
       res.send(result);
     })
 
-    app.delete('users/:id',verifyToken,verifyAdmin, async(req, res) => {
+    app.delete('/users/:id',verifyToken,verifyAdmin, async(req, res) => {
       const id = req.params.id;
       const query = {_id: new ObjectId(id) }
       const result = await userCollection.deleteOne(query);
@@ -130,13 +142,25 @@ async function run() {
       res.send(result);
     });
 
+    // উদাহরণ Express রাউট
+    app.patch('/products/upvote/:id', async (req, res) => {
+    const id = req.params.id;
+    const result = await productCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $inc: { upvotes: 1 } }
+  );
+  res.send(result);
+});
+
+
 
     // all reviews
-    app.post('/reviews/:id', async (req,res) => {
-      const reviewsDoc = req.body;
-      const result = await reviewsCollection.insertOne(reviewsDoc);
-      res.send(result);
-    });
+    app.get('/reviews', async (req, res) => {
+    const result = await reviewsCollection.find().toArray();
+   res.send(result);
+   });
+    
+
 
     app.get('/reviews/:id', async (req, res) => {
       const id = req.params.id;
@@ -144,6 +168,31 @@ async function run() {
       const result = await reviewsCollection.find(query).toArray();
       res.send(result);
     });
+
+
+   app.post('/reviews/:id', async (req, res) => {
+  const productId = req.params.id;
+  const reviewsDoc = req.body;
+
+  // নিশ্চিত করো যে ডাটাতে productId আছে
+  const reviewWithProductId = {
+    ...reviewsDoc,
+    productId: productId,
+  };
+
+  const result = await reviewsCollection.insertOne(reviewWithProductId);
+  res.send(result);
+});
+
+
+   
+    app.delete('/reviews/:id', async (req, res) => {
+  const id = req.params.id;
+  const query = { _id: new ObjectId(id) };
+  const result = await reviewsCollection.deleteOne(query);
+  res.send(result);
+});
+
 
 
     // Send a ping to confirm a successful connection
