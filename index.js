@@ -299,6 +299,36 @@ app.post('/payments', async (req, res) => {
   }
 });
 
+ // stats or analytics
+    app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
+  const users = await userCollection.estimatedDocumentCount();
+  const products = await productCollection.estimatedDocumentCount();
+  const payments = await paymentCollection.estimatedDocumentCount();
+  const reviews = await reviewsCollection.estimatedDocumentCount();
+
+  const result = await paymentCollection.aggregate([
+    {
+      $group: {
+        _id: null,
+        totalRevenue: {
+          $sum: '$price'
+        }
+      }
+    }
+  ]).toArray();
+
+  const revenue = result.length > 0 ? result[0].totalRevenue : 0;
+
+  res.send({
+    users,
+    products,
+    payments,
+    reviews,
+    revenue 
+  });
+});
+
+
 
 
     // Send a ping to confirm a successful connection
